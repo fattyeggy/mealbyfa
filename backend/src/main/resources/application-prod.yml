@@ -1,0 +1,18 @@
+# 体验/生产：真实微信登录、无演示账号、不自动建表
+spring:
+  sql:
+    init:
+      mode: never
+
+meal:
+  wx:
+    mock-enabled: false
+    app-id: ${WX_APP_ID:}
+    app-secret: ${WX_APP_SECRET:}
+  admin:
+    demo-accounts: false
+    username: ${ADMIN_USERNAME:}
+    password: ${ADMIN_PASSWORD:}
+    nickname: ${ADMIN_NICKNAME:超级管理员}
+  scheduling:
+    lock-enabled: true

@@ -1,0 +1,66 @@
+server:
+  port: 8080
+  servlet:
+    # 强制 UTF-8，避免中文在部分代理/客户端出现乱码
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  profiles:
+    # 不指定时按本地开发处理；体验/生产用 --spring.profiles.active=prod[,mysql]
+    default: local
+  application:
+    name: sancan-meal-service
+  datasource:
+    # 开发用 H2 文件库（MySQL 兼容模式）；生产替换为 MySQL 8 连接串与账号
+    url: jdbc:h2:file:./data/sancan;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      encoding: UTF-8
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+meal:
+  pricing:
+    # 生产默认只允许已审核的替换选项（计价规则 V1.0 §6.4）；开发/测试 profile 可放开
+    allow-unreviewed-swap: false
+  security:
+    token-ttl-minutes: 720
+  wx:
+    # 默认关闭 mock；本地由 application-local.yml 打开，体验/生产走 code2Session
+    mock-enabled: false
+  order:
+    # 服务日前一天 12:00（北京时间）截止下单
+    cutoff-hour: 12
+  scheduling:
+    lock-enabled: true
+    # 每日 12:00 锁次日订单
+    lock-cron: "0 0 12 * * ?"
+
+logging:
+  level:
+    com.sancan.meal: info
+    com.sancan.meal.**.dal.mapper: debug

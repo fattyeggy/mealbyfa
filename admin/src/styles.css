@@ -1,0 +1,49 @@
+:root {
+  --ink: #1c3b2e;
+  --green: #1f5b40;
+  --cream: #f4f1e9;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.page-desc {
+  font-size: 12px;
+  color: #8a9a91;
+  margin-bottom: 16px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--green);
+  --el-button-border-color: var(--green);
+  --el-button-hover-bg-color: #2a7153;
+  --el-button-hover-border-color: #2a7153;
+}

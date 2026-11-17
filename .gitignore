@@ -1,0 +1,10 @@
+**/node_modules/
+**/dist/
+**/target/
+backend/data/
+backend/.env.local
+.env.local
+.npm-cache/
+tools/
+.DS_Store
+*.log

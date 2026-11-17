@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F1E9; color: #1C3B2E;
+         font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  .wrap { width: 1080px; margin: 0 auto; padding: 44px 48px 40px; }
+  .brand { display: flex; align-items: baseline; gap: 14px; }
+  .brand h1 { margin: 0; font-size: 30px; color: #032C0A; letter-spacing: 1px; }
+  .brand span { font-size: 12px; letter-spacing: 3px; color: #7C8B80; }
+  .sub { margin: 6px 0 26px; font-size: 14px; color: #6D7F75; }
+
+  .legend { display: flex; gap: 22px; margin-bottom: 18px; font-size: 12.5px; color: #5E7166; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  .lg-user { background: #032C0A; }
+  .lg-sys { background: #8CC63F; }
+  .lg-ops { background: #C99A3F; }
+
+  .head, .row { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 14px; }
+  .head { margin-bottom: 10px; }
+  .head div { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #6D7F75;
+              text-transform: uppercase; padding-left: 6px; }
+
+  .cell { border-radius: 12px; padding: 13px 14px; font-size: 13px; line-height: 1.55; min-height: 62px; }
+  .u { background: #fff; border: 1px solid #D9E3D2; border-left: 4px solid #032C0A; }
+  .u b { display: block; font-size: 13.5px; color: #032C0A; margin-bottom: 3px; }
+  .s { background: #F2F7EC; border: 1px solid #D5E6C6; }
+  .o { background: #FBF5E8; border: 1px solid #EADFC4; }
+  .muted { color: #8A9A91; font-size: 12px; }
+
+  .link { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 14px; height: 30px; }
+  .link .arrowcell { display: flex; justify-content: center; }
+  .link svg { display: block; }
+
+  .note { margin-top: 22px; background: #EAF2E3; border-radius: 12px; padding: 14px 18px;
+          font-size: 12.5px; line-height: 1.7; color: #3F5546; }
+  .note b { color: #032C0A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><h1>发发的餐</h1><span>USER JOURNEY</span></div>
+  <p class="sub">小程序用户操作流程 · 从第一次打开到下一周复购（左右三列同时发生）</p>
+
+  <div class="legend">
+    <span><i class="lg-user"></i>用户在小程序里操作</span>
+    <span><i class="lg-sys"></i>系统自动完成</span>
+    <span><i class="lg-ops"></i>运营在后台操作</span>
+  </div>
+
+  <div class="head"><div>用户操作</div><div>系统自动</div><div>运营后台</div></div>
+
+  <!-- 1 -->
+  <div class="row">
+    <div class="cell u"><b>① 打开小程序，先看菜单</b>不用登录，切换本周/下周，左右滑动看每天三餐</div>
+    <div class="cell s">展示已发布菜单：主题、每日三餐、克重、蛋白、营养点</div>
+    <div class="cell o">发布周菜单（发布后不可改，只能新版）</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 2 -->
+  <div class="row">
+    <div class="cell u"><b>② 点「获取我的三餐方案」</b>首次进入会触发微信登录，自动识别账号</div>
+    <div class="cell s">微信登录（openid）→ 新用户建档，老用户恢复原账号</div>
+    <div class="cell o">给体验用户发放 credit 与优惠券</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 3 -->
+  <div class="row">
+    <div class="cell u"><b>③ 完成建档</b>性别、生日、身高体重、活动量、目标、食量、过敏原</div>
+    <div class="cell s">计算每日蛋白与热量目标；标记过敏原冲突</div>
+    <div class="cell o"></div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 4 -->
+  <div class="row">
+    <div class="cell u"><b>④ 生成本周个人计划</b>得到 7 天 × 三餐，每天蛋白、营养点、日价</div>
+    <div class="cell s">按目标蛋白分配 21 餐，计算份量、营养点与日价</div>
+    <div class="cell o">目标超出范围/份量触界时，处理「复核事项」后用户才能下单</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 5 -->
+  <div class="row">
+    <div class="cell u"><b>⑤ 查看每天三餐</b>克重、蛋白、营养点、展示价；日价拆分显示</div>
+    <div class="cell s">显示计划蛋白、基础 66 元、加量费、替换补差、日价</div>
+    <div class="cell o"></div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 6 -->
+  <div class="row">
+    <div class="cell u"><b>⑥ 想换菜就换（可选）</b>选替换菜品，看到新的克重与价格再确认</div>
+    <div class="cell s">按「当前成本 − 原始成本」重算差价，换回原菜价格归零</div>
+    <div class="cell o">审核开放可替换的菜品选项</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 7 -->
+  <div class="row">
+    <div class="cell u"><b>⑦ 下单</b>确认餐次与配送信息，选优惠券，看到「应付」金额</div>
+    <div class="cell s">校验过敏原与复核门禁，预占优惠券，生成「待锁定」订单</div>
+    <div class="cell o"></div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 8 -->
+  <div class="row">
+    <div class="cell u"><b>⑧ 等待锁单结果</b>服务日前一天 12:00 截止下单，锁单后扣款</div>
+    <div class="cell s">校验余额 → 核销优惠券 → 扣款 → 生成快照与配送批次</div>
+    <div class="cell o">查看锁单失败原因（如余额不足），人工处理</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 9 -->
+  <div class="row">
+    <div class="cell u"><b>⑨ 收餐</b>午餐一批；晚餐与次日早餐一批</div>
+    <div class="cell s">生成生产批次与配送批次，按餐次记录送达状态</div>
+    <div class="cell o">导出生产单、分装标签、配送清单；更新配送状态</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 10 -->
+  <div class="row">
+    <div class="cell u"><b>⑩ 完餐反馈</b>选剩余比例、饱腹感，可填备注</div>
+    <div class="cell s">汇总进食率与平均饱腹感，形成周复盘数据</div>
+    <div class="cell o">按周复盘调整菜单、份量与定价；发放下周 credit</div>
+  </div>
+  <div class="link"><div class="arrowcell"><svg width="2" height="30"><line x1="1" y1="0" x2="1" y2="23" stroke="#9DB3A5" stroke-width="2"/><path d="M-5 21 L1 29 L7 21" fill="#9DB3A5"/></svg></div><div></div><div></div></div>
+
+  <!-- 11 -->
+  <div class="row">
+    <div class="cell u"><b>⑪ 下一周继续</b>新菜单发布后重复 ⑤–⑩</div>
+    <div class="cell s">保留建档与计划，按新菜单重新生成</div>
+    <div class="cell o">发布下周菜单，跟进复购</div>
+  </div>
+
+  <div class="note">
+    <b>关键规则：</b>① 未登录也能看菜单；② 有未处理复核事项不能下单；
+    ③ 服务日前一天 12:00 截止下单；④ 优惠券一单一张、只能用一次；
+    ⑤ 换菜价格永远相对「最初默认餐次」计算，换回原价；⑥ 锁单后菜单/价格再变，历史订单不受影响。
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:sancan_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+  h2:
+    console:
+      enabled: false
+
+meal:
+  pricing:
+    # 测试环境放开自由替换，便于验证计价与差价逻辑
+    allow-unreviewed-swap: true
+  wx:
+    mock-enabled: true
+  admin:
+    # 测试沿用本地演示账号，避免初始化器把测试自建账号停用
+    demo-accounts: true
+  scheduling:
+    lock-enabled: false
+
+logging:
+  level:
+    root: warn
+    com.sancan.meal: info
