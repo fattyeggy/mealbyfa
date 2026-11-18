@@ -11,6 +11,7 @@ import com.sancan.meal.member.user.dal.dataobject.MemberUserDO;
 import com.sancan.meal.member.user.dal.mapper.MemberUserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +56,15 @@ public class MemberAuthService {
             user.setNickname(nickname == null || nickname.isBlank() ? "新用户" : nickname);
             user.setAvatar(avatar);
             user.setStatus(0);
-            memberUserMapper.insert(user);
+            try {
+                memberUserMapper.insert(user);
+            } catch (DuplicateKeyException ex) {
+                // 小程序启动时可能并发登录两次，唯一索引兜底后回查已有用户
+                user = memberUserMapper.selectByOpenid(openid);
+                if (user == null) {
+                    throw ex;
+                }
+            }
         } else if (user.getStatus() != null && user.getStatus() != 0) {
             throw new ServiceException(ErrorCode.FORBIDDEN, "账号已停用");
         }
