@@ -17,13 +17,14 @@
     }
   },
   "mp-weixin": {
-    "appid": "wx03a10b57ddf70e89",
+    "appid": "wx4643cebc1711b844",
     "setting": {
       "urlCheck": false,
       "es6": true,
       "minified": true
     },
-    "usingComponents": true
+    "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents"
   },
   "vueVersion": "3"
 }

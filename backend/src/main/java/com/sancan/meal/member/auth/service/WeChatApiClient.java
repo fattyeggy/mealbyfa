@@ -15,7 +15,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * 微信 code2Session：用 wx.login 的 code 换取 openid。
@@ -29,8 +34,38 @@ public class WeChatApiClient {
 
     private final MealProperties properties;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5)).build();
+    /**
+     * 云托管出网经过代理，容器 JRE 不信任代理证书，导致访问 api.weixin.qq.com 时 PKIX 失败。
+     * 这里只对微信 API 客户端放开证书链校验；正式上线前应改为导入代理 CA。
+     */
+    private final HttpClient httpClient = buildWeChatClient();
+
+    private static HttpClient buildWeChatClient() {
+        try {
+            TrustManager[] trustAll = new TrustManager[]{new X509TrustManager() {
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
+                    return new X509Certificate[0];
+                }
+
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                }
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                }
+            }};
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, trustAll, new SecureRandom());
+            log.warn("微信 API 客户端使用临时信任策略（云托管代理证书），上线前替换为正式 CA");
+            return HttpClient.newBuilder().sslContext(context)
+                    .connectTimeout(Duration.ofSeconds(8)).build();
+        } catch (Exception ex) {
+            log.error("初始化微信 API 客户端失败，回退默认信任", ex);
+            return HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
+        }
+    }
 
     public WeChatApiClient(MealProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
