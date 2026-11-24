@@ -9,6 +9,13 @@ meal:
     mock-enabled: false
     app-id: ${WX_APP_ID:}
     app-secret: ${WX_APP_SECRET:}
+    # 云托管开启「开放接口服务」时需要：平台代理证书（PEM）路径；关闭该服务则留空
+    ca-cert-path: ${WX_CA_CERT_PATH:}
+    # 应急开关，不校验微信接口证书；默认 false，不要长期开启
+    insecure-skip-tls-verify: ${WX_INSECURE_SKIP_TLS_VERIFY:false}
+  security:
+    # 认领码密钥：沿用部署时已有的 JWT_SECRET；单独设置用 CLAIM_SECRET
+    claim-secret: ${CLAIM_SECRET:${JWT_SECRET:}}
   admin:
     demo-accounts: false
     username: ${ADMIN_USERNAME:}

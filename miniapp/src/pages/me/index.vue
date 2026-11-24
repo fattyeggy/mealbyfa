@@ -2,7 +2,9 @@
 import { onMounted, ref } from 'vue'
 import TabBar from '@/components/TabBar.vue'
 import { api, switchDemoAccount } from '@/utils/api'
-import { money, refreshProfile, refreshWallet, session } from '@/store/session'
+import { couponRule, money, refreshProfile, refreshWallet, session } from '@/store/session'
+// 演示账号切换只在开发构建里出现，正式版不显示
+const isDev = !!(import.meta as any).env?.DEV
 import { safeTop } from '@/utils/safe-area'
 const topInset = safeTop(16, false)
 
@@ -59,7 +61,7 @@ function switchAccount() {
   })
 }
 
-const goalText: Record<string, string> = { LOSE: '减脂', MAINTAIN: '维持', GAIN: '增肌' }
+const goalText: Record<string, string> = { LOSE: '减脂', MAINTAIN: '维持', GAIN: '增肌', cut: '减脂', maintain: '维持', bulk: '增肌' }
 </script>
 
 <template>
@@ -90,10 +92,6 @@ const goalText: Record<string, string> = { LOSE: '减脂', MAINTAIN: '维持', G
         <text class="muted">过敏原</text>
         <text class="muted">{{ session.profile.allergies?.length ? session.profile.allergies.join('、') : '无' }}</text>
       </view>
-      <view class="row between profile-row">
-        <text class="muted">蛋白偏好</text>
-        <text class="muted">{{ session.profile.proteinPref || '无' }}</text>
-      </view>
     </view>
     <view v-else class="card profile empty">
       <text class="muted">还没有完成建档</text>
@@ -106,8 +104,8 @@ const goalText: Record<string, string> = { LOSE: '减脂', MAINTAIN: '维持', G
       <view v-for="coupon in coupons" :key="coupon.id" class="coupon">
         <view class="coupon-amount">券</view>
         <view class="coupon-main">
-          <text class="coupon-code">{{ coupon.code }}</text>
-          <text class="muted">有效期至 {{ coupon.endTime?.slice(0, 10) }}</text>
+          <text class="coupon-code">{{ coupon.name }}</text>
+          <text class="muted">{{ couponRule(coupon) }} · 有效期至 {{ coupon.endTime?.slice(0, 10) }}</text>
         </view>
       </view>
     </view>
@@ -128,7 +126,7 @@ const goalText: Record<string, string> = { LOSE: '减脂', MAINTAIN: '维持', G
       </view>
     </view>
 
-    <view class="btn btn-ghost switch" @click="switchAccount">切换演示账号</view>
+    <view v-if="isDev" class="btn btn-ghost switch" @click="switchAccount">切换演示账号</view>
 
     <TabBar current="me" />
   </view>

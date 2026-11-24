@@ -9,6 +9,7 @@ const router = useRouter()
 const menus = [
   { path: '/menus', label: '每周菜单', hint: '发布与检查' },
   { path: '/catalog', label: '菜品与食材', hint: '版本与 BOM' },
+  { path: '/cook', label: '做菜记录', hint: '手机边做边记' },
   { path: '/reviews', label: '复核事项', hint: '待人工确认' },
   { path: '/pricing', label: '定价版本', hint: '价格与替换' },
   { path: '/orders', label: '订单', hint: '锁定与配送' },

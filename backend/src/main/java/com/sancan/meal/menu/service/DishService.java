@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -144,7 +145,8 @@ public class DishService {
                         ingredient == null ? "" : ingredient.getUsageUnit(),
                         line.getNetWeightG(),
                         lineCost,
-                        line.getNote()));
+                        line.getNote(),
+                        line.getComponentType()));
             }
             versionResps.add(new DishDetailResp.Version(
                     version.getId(), version.getVersion(), version.getNetWeightG(), version.getKcal(),
@@ -159,6 +161,20 @@ public class DishService {
     }
 
     /** 过敏原 = 额外声明 ∪ 所有版本 BOM 食材的过敏原。 */
+    private static final Set<String> COMPONENT_TYPES =
+            Set.of("PROTEIN", "SAUCE", "STAPLE", "VEGETABLE", "FAT", "OTHER");
+
+    private String normalizeComponentType(String type) {
+        if (type == null || type.isBlank()) {
+            return null;
+        }
+        String upper = type.trim().toUpperCase();
+        if (!COMPONENT_TYPES.contains(upper)) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "组件类型不正确：" + type);
+        }
+        return upper;
+    }
+
     public List<String> collectAllergens(DishDO dish, java.util.Collection<IngredientDO> ingredients) {
         Set<String> result = new LinkedHashSet<>();
         if (dish.getExtraAllergens() != null && !dish.getExtraAllergens().isBlank()) {
@@ -211,10 +227,14 @@ public class DishService {
         }
         List<DishVersionSaveReq.BomLineReq> lines = req.bom();
         Set<Long> ingredientIds = new LinkedHashSet<>();
+        Set<String> lineKeys = new HashSet<>();
         for (DishVersionSaveReq.BomLineReq line : lines) {
-            if (!ingredientIds.add(line.ingredientId())) {
+            String componentType = normalizeComponentType(line.componentType());
+            // 同一食材只能出现一次；指定了不同组件类型时允许各出现一次
+            if (!lineKeys.add(line.ingredientId() + "#" + (componentType == null ? "" : componentType))) {
                 throw new ServiceException(ErrorCode.BAD_REQUEST, "BOM 中食材重复：" + line.ingredientId());
             }
+            ingredientIds.add(line.ingredientId());
             if (line.netWeightG() == null || line.netWeightG().signum() <= 0) {
                 throw new ServiceException(ErrorCode.BAD_REQUEST, "BOM 可食生重必须大于 0");
             }
@@ -256,6 +276,8 @@ public class DishService {
             bom.setIngredientId(line.ingredientId());
             bom.setNetWeightG(line.netWeightG());
             bom.setNote(line.note());
+            bom.setComponentType(normalizeComponentType(line.componentType()));
+            bom.setCookedWeightG(line.cookedWeightG());
             bom.setSortNo(sort++);
             bomDOs.add(bom);
         }

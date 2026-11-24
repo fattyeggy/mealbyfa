@@ -37,6 +37,8 @@ public record DishDetailResp(
             String usageUnit,
             BigDecimal netWeightG,
             BigDecimal cost,
-            String note) {
+            String note,
+            /** 配方行指定的组件类型，为空表示沿用食材类型。 */
+            String componentType) {
     }
 }

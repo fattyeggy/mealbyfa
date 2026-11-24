@@ -21,7 +21,11 @@ public record DishVersionSaveReq(
     public record BomLineReq(
             @NotNull(message = "食材不能为空") Long ingredientId,
             @NotNull(message = "可食生重不能为空") BigDecimal netWeightG,
-            @Size(max = 255) String note) {
+            @Size(max = 255) String note,
+            /** 可选：PROTEIN / SAUCE / STAPLE / VEGETABLE / FAT / OTHER，覆盖食材上的组件类型。 */
+            String componentType,
+            /** 可选：本行在标准一份里的熟重（克）。 */
+            BigDecimal cookedWeightG) {
     }
 
     /** 兼容仅传菜品名与分类的简化建档场景。 */

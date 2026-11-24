@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import TabBar from '@/components/TabBar.vue'
 import { api } from '@/utils/api'
-import { mealLabel, money } from '@/store/session'
+import { cleanDishName, mealLabel, money, todayIso } from '@/store/session'
 import { safeTop } from '@/utils/safe-area'
 const topInset = safeTop(16, false)
 
@@ -105,6 +105,17 @@ async function submitFeedback() {
   }
 }
 
+/** 列表显示实际要付的金额（标价减券），不是标价 */
+function payable(order: any) {
+  return Math.max(0, Number(order.originalAmount || 0) - Number(order.couponAmount || 0))
+}
+
+/** 只在送达后（或服务日已过）显示反馈入口；未送达点了只会报错 */
+function canFeedback(order: any) {
+  if (!order || ['PENDING_CONFIRM', 'PENDING_LOCK', 'CANCELLED', 'REFUNDED', 'PAUSED'].includes(order.status)) return false
+  return order.serviceDate <= todayIso()
+}
+
 function statusText(status: string) {
   const map: Record<string, string> = {
     PENDING_CONFIRM: '待确认',
@@ -175,7 +186,7 @@ function sortedItems(items: any[]) {
       </view>
       <view class="row between order-meta">
         <text class="muted">{{ order.orderNo }}</text>
-        <text class="order-amount">¥{{ money(order.originalAmount) }}</text>
+        <text class="order-amount">¥{{ money(payable(order)) }}</text>
       </view>
     </view>
 
@@ -193,13 +204,13 @@ function sortedItems(items: any[]) {
           <view class="row between">
             <view class="row">
               <text class="meal-badge">{{ item.mealLabel || mealLabel(item.mealType) }}</text>
-              <text class="item-name">{{ item.dishName }}</text>
+              <text class="item-name">{{ cleanDishName(item.dishName) }}</text>
             </view>
             <text>¥{{ money(item.price) }}</text>
           </view>
           <view class="row between">
-            <text class="muted">{{ item.weightG }}g · {{ item.proteinG }}g 蛋白 · {{ item.points }} 点</text>
-            <text class="feedback-link" @click="openFeedback(item)">反馈</text>
+            <text class="muted">{{ item.weightG }}g · {{ item.proteinG }}g 蛋白 · {{ item.kcal }} kcal</text>
+            <text v-if="canFeedback(detail)" class="feedback-link" @click="openFeedback(item)">反馈</text>
           </view>
         </view>
 
@@ -212,7 +223,7 @@ function sortedItems(items: any[]) {
           <text class="muted">余额抵扣</text><text>¥{{ money(detail.balanceAmount) }}</text>
         </view>
         <view class="row between amount-line">
-          <text class="muted">定价版本</text><text class="muted">{{ detail.pricingVersionNo || '-' }}</text>
+          <text class="muted">应付</text><text>¥{{ money(payable(detail)) }}</text>
         </view>
         <view class="muted" v-if="detail.lockFailReason">{{ detail.lockFailReason }}</view>
         <view class="muted">配送：{{ detail.contactName }} {{ detail.contactPhone }}，{{ detail.address }}</view>
@@ -224,7 +235,7 @@ function sortedItems(items: any[]) {
 
     <view v-if="showFeedback" class="sheet-mask" @click.self="showFeedback = false">
       <view class="sheet">
-        <view class="sheet-title">{{ feedbackMeal?.mealLabel || '' }} {{ feedbackMeal?.dishName || '' }}</view>
+        <view class="sheet-title">{{ feedbackMeal?.mealLabel || '' }} {{ cleanDishName(feedbackMeal?.dishName) }}</view>
         <view class="sheet-tip">反馈用于周复盘，运营会据此调整后续计划</view>
 
         <view class="ratio-row">

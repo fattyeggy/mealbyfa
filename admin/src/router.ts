@@ -3,6 +3,9 @@ import { getToken } from './api'
 
 const routes = [
   { path: '/login', component: () => import('./views/Login.vue'), meta: { public: true } },
+  // 做菜记录：厨房手机全屏使用，不套后台侧栏
+  { path: '/cook', component: () => import('./views/cook/CookList.vue'), meta: { title: '做菜记录' } },
+  { path: '/cook/:id', component: () => import('./views/cook/CookRecord.vue'), meta: { title: '做菜记录' } },
   {
     path: '/',
     component: () => import('./layout/AdminLayout.vue'),

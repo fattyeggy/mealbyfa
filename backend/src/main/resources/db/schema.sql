@@ -126,12 +126,16 @@ CREATE TABLE IF NOT EXISTS meal_recipe_bom (
     net_weight_g    DECIMAL(10,2) NOT NULL DEFAULT 0,
     sort_no         INT           NOT NULL DEFAULT 0,
     note            VARCHAR(255)  DEFAULT NULL,
+    -- 配方行组件类型，覆盖食材上的 component_type；做菜记录同步时写入（SAUCE 汤汁跟主料缩放）
+    component_type  VARCHAR(16)   DEFAULT NULL,
+    -- 本行在标准一份里的熟重；为空时按版本净重等比折算
+    cooked_weight_g DECIMAL(10,2) DEFAULT NULL,
     creator         VARCHAR(64)   DEFAULT NULL,
     create_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater         VARCHAR(64)   DEFAULT NULL,
     update_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted         TINYINT       NOT NULL DEFAULT 0,
-    CONSTRAINT uk_meal_recipe_bom UNIQUE (dish_version_id, ingredient_id)
+    CONSTRAINT uk_meal_recipe_bom UNIQUE (dish_version_id, ingredient_id, component_type)
 );
 
 -- 周菜单：一个自然周的地区主题，包含 7 天 21 餐次
@@ -677,4 +681,36 @@ CREATE TABLE IF NOT EXISTS meal_feedback (
     update_time    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted        TINYINT     NOT NULL DEFAULT 0,
     CONSTRAINT uk_meal_feedback UNIQUE (order_id, meal_type)
+);
+
+-- 做菜记录：一锅菜的食材生重、出品组件熟重、步骤与照片 ID（JSON），可同步成菜品版本
+CREATE TABLE IF NOT EXISTS meal_cook_record (
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dish_id            BIGINT        DEFAULT NULL,
+    title              VARCHAR(64)   NOT NULL,
+    cook_date          DATE          NOT NULL,
+    status             VARCHAR(16)   NOT NULL DEFAULT 'DRAFT',
+    content            MEDIUMTEXT    DEFAULT NULL,
+    synced_version_id  BIGINT        DEFAULT NULL,
+    synced_time        DATETIME      DEFAULT NULL,
+    remark             VARCHAR(255)  DEFAULT NULL,
+    creator            VARCHAR(64)   DEFAULT NULL,
+    create_time        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater            VARCHAR(64)   DEFAULT NULL,
+    update_time        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted            TINYINT       NOT NULL DEFAULT 0
+);
+
+-- 做菜步骤照片：存库而非本地磁盘（云托管容器磁盘不持久）
+CREATE TABLE IF NOT EXISTS meal_cook_photo (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id     BIGINT        NOT NULL,
+    content_type  VARCHAR(64)   NOT NULL,
+    size_bytes    INT           NOT NULL DEFAULT 0,
+    data          MEDIUMBLOB    NOT NULL,
+    creator       VARCHAR(64)   DEFAULT NULL,
+    create_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater       VARCHAR(64)   DEFAULT NULL,
+    update_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted       TINYINT       NOT NULL DEFAULT 0
 );

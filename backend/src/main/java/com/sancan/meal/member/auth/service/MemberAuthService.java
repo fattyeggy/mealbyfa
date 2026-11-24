@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
@@ -43,7 +42,10 @@ public class MemberAuthService {
         this.weChatApiClient = weChatApiClient;
     }
 
-    @Transactional
+    /**
+     * 不加事务：并发登录撞唯一索引后要回查对方刚提交的用户。若在事务里，MySQL 默认可重复读会
+     * 沿用第一次查询的快照，回查仍是空，兜底失效。这里只有一次插入，不需要事务。
+     */
     public LoginResp login(String code, String nickname, String avatar) {
         if (code == null || code.isBlank()) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "缺少微信登录 code");

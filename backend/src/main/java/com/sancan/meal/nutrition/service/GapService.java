@@ -1,6 +1,10 @@
 package com.sancan.meal.nutrition.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sancan.meal.order.dal.dataobject.OrderDO;
+import com.sancan.meal.order.dal.dataobject.OrderItemDO;
+import com.sancan.meal.order.dal.mapper.OrderItemMapper;
+import com.sancan.meal.order.dal.mapper.OrderMapper;
 import com.sancan.meal.plan.dal.dataobject.PlanItemDO;
 import com.sancan.meal.plan.dal.dataobject.UserProfileDO;
 import com.sancan.meal.plan.dal.mapper.PlanItemMapper;
@@ -27,8 +31,13 @@ public class GapService {
 
     private final UserProfileMapper profileMapper;
     private final PlanItemMapper planItemMapper;
+    private final OrderMapper orderMapper;
+    private final OrderItemMapper orderItemMapper;
 
-    public GapService(UserProfileMapper profileMapper, PlanItemMapper planItemMapper) {
+    public GapService(UserProfileMapper profileMapper, PlanItemMapper planItemMapper,
+                      OrderMapper orderMapper, OrderItemMapper orderItemMapper) {
+        this.orderMapper = orderMapper;
+        this.orderItemMapper = orderItemMapper;
         this.profileMapper = profileMapper;
         this.planItemMapper = planItemMapper;
     }
@@ -38,18 +47,25 @@ public class GapService {
                        int gapG, int excessG, String status, boolean achieved, String volumeText) {
     }
 
+    /**
+     * @param ordered 这天是否有有效订单。true：实际值按订单里的餐次计算；
+     *                false：还没订，实际值按建档选的餐次估算（页面应提示“还没订”，不能当成已吃够）。
+     */
     public record Resp(LocalDate serviceDate, int targetKcal, int actualKcal,
                        String kcalStatus, int kcalDiff,
-                       List<Line> lines, boolean allAchieved) {
+                       List<Line> lines, boolean allAchieved, boolean ordered) {
     }
 
     public Resp compute(Long userId, LocalDate date) {
         UserProfileDO profile = profileMapper.selectOne(
                 new LambdaQueryWrapper<UserProfileDO>().eq(UserProfileDO::getUserId, userId));
         if (profile == null) {
-            return new Resp(date, 0, 0, "OK", 0, List.of(), true);
+            return new Resp(date, 0, 0, "OK", 0, List.of(), true, false);
         }
-        Set<String> meals = parseMeals(profile.getOrderedMeals());
+        // 有有效订单时以订单里的餐次为准；没订时按建档选的餐次估算
+        Set<String> orderedMeals = orderedMealTypes(userId, date);
+        boolean hasOrder = !orderedMeals.isEmpty();
+        Set<String> meals = hasOrder ? orderedMeals : parseMeals(profile.getOrderedMeals());
         List<PlanItemDO> items = planItemMapper.selectList(new LambdaQueryWrapper<PlanItemDO>()
                 .eq(PlanItemDO::getUserId, userId)
                 .eq(PlanItemDO::getServiceDate, date));
@@ -68,7 +84,7 @@ public class GapService {
         int kTarget = profile.getTargetKcal() == null ? 0 : profile.getTargetKcal();
 
         List<Line> lines = new ArrayList<>();
-        lines.add(line("protein", "蛋白质", pTarget, actualProtein, 25, "掌心"));
+        lines.add(line("protein", "蛋白质", pTarget, actualProtein, 25, "个掌心大小的瘦肉"));
         lines.add(line("carb", "碳水", cTarget, actualCarb, 40, "拳米饭"));
         lines.add(line("fat", "脂肪", fTarget, actualFat, 14, "汤匙油"));
 
@@ -88,7 +104,7 @@ public class GapService {
             kcalStatus = "OK";
             kcalDiff = 0;
         }
-        return new Resp(date, kTarget, actualKcal, kcalStatus, kcalDiff, lines, all);
+        return new Resp(date, kTarget, actualKcal, kcalStatus, kcalDiff, lines, all, hasOrder);
     }
 
     private Line line(String key, String label, int target, int actual, int perServing, String food) {
@@ -98,7 +114,7 @@ public class GapService {
         if (actual < target * (1 - SHORT_TOLERANCE)) {
             int gap = target - actual;
             return new Line(key, label, target, actual, gap, 0, "SHORT", false,
-                    "还差 " + gap + "g，约 " + volume(gap, perServing, food));
+                    "还差 " + gap + "g，" + volume(gap, perServing, food));
         }
         if (actual > target * (1 + OVER_TOLERANCE)) {
             int excess = actual - target;
@@ -107,20 +123,40 @@ public class GapService {
                 return new Line(key, label, target, actual, 0, 0, "OK", true, "已达标");
             }
             return new Line(key, label, target, actual, 0, excess, "OVER", false,
-                    "超出 " + excess + "g，约 " + volume(excess, perServing, food));
+                    "超出 " + excess + "g，" + volume(excess, perServing, food));
         }
         return new Line(key, label, target, actual, Math.max(target - actual, 0), 0, "OK", true, "已达标");
+    }
+
+    private static final Set<String> INACTIVE = Set.of("CANCELLED", "REFUNDED", "PAUSED");
+
+    private Set<String> orderedMealTypes(Long userId, LocalDate date) {
+        List<Long> orderIds = orderMapper.selectList(new LambdaQueryWrapper<OrderDO>()
+                        .eq(OrderDO::getUserId, userId)
+                        .eq(OrderDO::getServiceDate, date)
+                        .notIn(OrderDO::getStatus, INACTIVE))
+                .stream().map(OrderDO::getId).toList();
+        if (orderIds.isEmpty()) {
+            return Set.of();
+        }
+        return orderItemMapper.selectList(new LambdaQueryWrapper<OrderItemDO>()
+                        .in(OrderItemDO::getOrderId, orderIds))
+                .stream().map(OrderItemDO::getMealType).collect(Collectors.toSet());
     }
 
     private String volume(int grams, int perServing, String food) {
         double servings = grams / (double) perServing;
         double rounded = Math.round(servings * 2) / 2.0;
+        // 例：约 2 个掌心大小的瘦肉 / 约 1.5 拳米饭 / 约半汤匙油
         if (rounded < 0.5) {
-            return "不到半份" + food;
+            return "不到半" + food;
+        }
+        if (rounded == 0.5) {
+            return "约半" + food;
         }
         String amount = rounded == Math.floor(rounded) ? String.valueOf((int) rounded)
                 : String.valueOf(rounded);
-        return amount + " 份" + food;
+        return "约 " + amount + " " + food;
     }
 
     private Set<String> parseMeals(String value) {

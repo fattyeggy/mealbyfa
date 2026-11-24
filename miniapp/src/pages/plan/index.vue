@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import TabBar from '@/components/TabBar.vue'
 import { api } from '@/utils/api'
-import { mealLabel, money, session } from '@/store/session'
+import { cleanDishName, mealLabel, money, session } from '@/store/session'
 import { safeTop } from '@/utils/safe-area'
 const topInset = safeTop(16, false)
 
@@ -14,9 +14,15 @@ const expanded = ref<string>('')
 const showSwap = ref(false)
 const swapContext = ref<{ serviceDate: string; mealType: string; dishName: string } | null>(null)
 
-function cleanName(name: string) {
-  return (name || '').replace(/-?P\d+$/i, '').replace(/P\d+$/i, '')
-}
+const cleanName = cleanDishName
+
+/** 显示当前看的是哪一周（本周没有计划时会自动显示下周） */
+const weekRange = computed(() => {
+  const days = plan.value?.days || []
+  if (!days.length) return ''
+  const f = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`
+  return `${f(days[0].serviceDate)}—${f(days[days.length - 1].serviceDate)}`
+})
 const options = ref<any[]>([])
 const preview = ref<any>(null)
 const previewing = ref(false)
@@ -133,8 +139,9 @@ function sortedMeals(day: any) {
       <view>
         <view class="brand">P L A N</view>
         <view class="title">我的计划</view>
+        <view v-if="weekRange" class="muted">{{ weekRange }}</view>
       </view>
-      <text class="muted">¥{{ weekPrice }} / 周</text>
+      <text class="muted">整周 ¥{{ weekPrice }}</text>
     </view>
 
     <view v-if="loading" class="card tip"><text class="muted">加载中…</text></view>
@@ -219,7 +226,7 @@ function sortedMeals(day: any) {
         <template v-else>
           <view class="preview-row">
             <text class="muted">替换为</text>
-            <text class="option-name">{{ preview.toDishName }}</text>
+            <text class="option-name">{{ cleanName(preview.toDishName) }}</text>
           </view>
           <view class="preview-row">
             <text class="muted">份量</text>

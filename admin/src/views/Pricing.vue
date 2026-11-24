@@ -30,6 +30,8 @@ const creating = ref(false)
 const form = reactive({
   versionNo: '',
   dailyBasePrice: 66,
+  // 基础日价含的蛋白克数；原表单缺这个字段，输入框一开始是空的
+  includedProteinG: 60,
   extraProteinPricePer10g: 1.9,
   minDailyPrice: 65,
   minTargetProteinG: 80,

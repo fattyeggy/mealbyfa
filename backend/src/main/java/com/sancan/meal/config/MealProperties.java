@@ -35,6 +35,16 @@ public class MealProperties {
     public static class Security {
         /** 令牌有效期（分钟）。 */
         private long tokenTtlMinutes = 720;
+        /** 认领码密钥（HMAC）。为空时使用微信 AppSecret；都为空时使用开发密钥。 */
+        private String claimSecret = "";
+
+        public String getClaimSecret() {
+            return claimSecret;
+        }
+
+        public void setClaimSecret(String claimSecret) {
+            this.claimSecret = claimSecret;
+        }
 
         public long getTokenTtlMinutes() {
             return tokenTtlMinutes;
@@ -50,6 +60,29 @@ public class MealProperties {
         private boolean mockEnabled = true;
         private String appId = "";
         private String appSecret = "";
+        /**
+         * 额外信任的 CA 证书（PEM 文件路径，可含多张）。云托管开启「开放接口服务」时，
+         * 出网请求会被平台代理用自己的证书接管，需要信任该证书；关闭该服务则不需要。
+         */
+        private String caCertPath = "";
+        /** 应急开关：完全不校验微信接口证书。会让 AppSecret 与登录结果可被中间人截获或伪造，默认关闭。 */
+        private boolean insecureSkipTlsVerify = false;
+
+        public String getCaCertPath() {
+            return caCertPath;
+        }
+
+        public void setCaCertPath(String caCertPath) {
+            this.caCertPath = caCertPath;
+        }
+
+        public boolean isInsecureSkipTlsVerify() {
+            return insecureSkipTlsVerify;
+        }
+
+        public void setInsecureSkipTlsVerify(boolean insecureSkipTlsVerify) {
+            this.insecureSkipTlsVerify = insecureSkipTlsVerify;
+        }
 
         public boolean isMockEnabled() {
             return mockEnabled;

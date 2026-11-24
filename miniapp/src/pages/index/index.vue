@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import TabBar from '@/components/TabBar.vue'
 import { api } from '@/utils/api'
-import { isOnboarded, mealLabel, money, refreshProfile, refreshWallet, session } from '@/store/session'
+import { cleanDishName, couponRule, isOnboarded, mealLabel, money, refreshProfile, refreshWallet, session, weekdayOf } from '@/store/session'
 import { safeTop } from '@/utils/safe-area'
 const topInset = safeTop(12, true)
 
@@ -25,6 +25,8 @@ const weeklyDates = ref<string[]>([])
 const weeklyCouponId = ref<number | null>(null)
 const weeklyCoupons = ref<any[]>([])
 const weeklyBusy = ref(false)
+// 本周可预订的全部日期（首次试算时取得）；取消某天后它仍留在列表里，可以再选回来
+const weeklyCandidates = ref<any[]>([])
 const homeGap = ref<any>(null)
 const weekOrderedDays = computed(() => {
   const dates = new Set((days.value || []).map((d: any) => d.serviceDate))
@@ -203,9 +205,13 @@ async function pickCoupon(id: number | null) {
   await refreshQuote()
 }
 
-function cleanName(name: string) {
-  return (name || '').replace(/-?P\d+$/i, '').replace(/P\d+$/i, '')
-}
+const cleanName = cleanDishName
+
+// 这天是否已有有效订单：没订时不展示营养进度，避免把“还没订”显示成“已达标”
+const currentDayOrdered = computed(() =>
+  myOrders.value.some((o: any) => o.serviceDate === currentDay.value?.serviceDate
+    && !['CANCELLED', 'REFUNDED', 'PAUSED'].includes(o.status)))
+const weekWord = computed(() => (weekOffset.value === 0 ? '本周' : '下周'))
 
 function weekStartOf() {
   const start = plan.value?.weekStart || week.value?.startDate
@@ -219,19 +225,33 @@ function weekStartOf() {
 async function openWeekly() {
   showWeekly.value = true
   weeklyCouponId.value = null
+  weeklyQuote.value = null
+  weeklyCandidates.value = []
+  weeklyDates.value = []
   try {
     weeklyCoupons.value = await api.get('/app/coupons?status=UNUSED')
   } catch (e) { weeklyCoupons.value = [] }
-  await refreshWeekly()
+  try {
+    // 不传日期 = 这周所有还能订的日子，默认全选
+    const all: any = await api.post('/app/orders/weekly/quote', { weekStart: weekStartOf() })
+    weeklyCandidates.value = all.days || []
+    weeklyDates.value = weeklyCandidates.value.map((d: any) => d.serviceDate)
+    weeklyQuote.value = all
+  } catch (e: any) {
+    uni.showToast({ title: e.message || '这周没有可预订的日期', icon: 'none' })
+  }
 }
 
 async function refreshWeekly() {
-  const body: any = { weekStart: weekStartOf() }
-  if (weeklyDates.value.length) body.dates = weeklyDates.value
+  if (!weeklyDates.value.length) {
+    // 一天都没选：不请求试算（接口会把空列表当成“全选”）
+    weeklyQuote.value = { originalTotal: 0, couponDiscount: 0, payableTotal: 0, couponValid: true }
+    return
+  }
+  const body: any = { weekStart: weekStartOf(), dates: [...weeklyDates.value].sort() }
   if (weeklyCouponId.value) body.couponId = weeklyCouponId.value
   try {
     weeklyQuote.value = await api.post('/app/orders/weekly/quote', body)
-    weeklyDates.value = (weeklyQuote.value.days || []).map((d: any) => d.serviceDate)
   } catch (e: any) {
     uni.showToast({ title: e.message || '试算失败', icon: 'none' })
   }
@@ -260,9 +280,13 @@ async function submitWeekly() {
   }
   weeklyBusy.value = true
   try {
+    if (weeklyCouponId.value && weeklyQuote.value && weeklyQuote.value.couponValid === false) {
+      uni.showToast({ title: weeklyQuote.value.couponMessage || '这张券不可用', icon: 'none' })
+      return
+    }
     await api.post('/app/orders/weekly', {
       weekStart: weekStartOf(),
-      dates: weeklyDates.value,
+      dates: [...weeklyDates.value].sort(),
       couponId: weeklyCouponId.value,
       ...delivery.value
     })
@@ -321,8 +345,8 @@ function dayNumber(iso: string) {
   return Number(iso?.split('-')[2] || 0)
 }
 
-function weekdayText(index: number) {
-  return ['一', '二', '三', '四', '五', '六', '日'][index] || ''
+function weekdayText(iso: string) {
+  return weekdayOf(iso)
 }
 
 const mealOrder = ['BREAKFAST', 'LUNCH', 'DINNER']
@@ -358,7 +382,7 @@ function sortedMeals(day: any) {
         <view class="hero-week">{{ weekTitle }} · {{ weekOffset === 0 ? '本周' : '下周' }}菜单</view>
         <view class="hero-theme">{{ plan?.themeName || week?.themeName || '等待发布' }}</view>
         <view class="hero-desc">
-          {{ mode === 'ready' ? '已按你的计划生成个人份量' : '照烧、味噌、芝麻与荞麦的清爽组合' }}
+          {{ mode === 'ready' ? '已按你的计划生成个人份量' : (week?.region ? week.region + '风味 · ' : '') + '每餐按你的目标配好克重与营养' }}
         </view>
       </view>
 
@@ -380,7 +404,7 @@ function sortedMeals(day: any) {
           :class="{ active: index === selectedIndex }"
           @click="selectedIndex = index"
         >
-          <text class="date-week">{{ weekdayText(index) }}</text>
+          <text class="date-week">{{ weekdayText(day.serviceDate) }}</text>
           <text class="date-num">{{ dayNumber(day.serviceDate) }}</text>
         </view>
       </scroll-view>
@@ -416,19 +440,16 @@ function sortedMeals(day: any) {
             </view>
             <view class="meal-foot" v-if="mode === 'ready'">
               <text class="meal-price">¥{{ money(meal.price) }}</text>
-              <text class="muted">{{ meal.mealLabel }}</text>
             </view>
           </view>
         </view>
 
-        <view v-if="homeGap && homeGap.lines?.length" class="card gap-card">
-          <view class="gap-title">今日营养进度</view>
+        <view v-if="homeGap && homeGap.ordered && currentDayOrdered && homeGap.lines?.length" class="card gap-card">
+          <view class="gap-title">{{ short(currentDay.serviceDate) }} 营养进度</view>
+          <view v-if="homeGap.allAchieved" class="muted">这天的三餐已覆盖全天目标</view>
           <view v-for="line in homeGap.lines" :key="line.nutrient" class="gap-row">
             <text>{{ line.label }}</text>
-            <text :class="{ over: line.status === 'OVER' }">
-              {{ line.status === 'SHORT' ? '还差 ' + line.gapG + 'g'
-                 : line.status === 'OVER' ? '超出 ' + line.excessG + 'g' : '已达标' }}
-            </text>
+            <text :class="{ over: line.status === 'OVER' }">{{ line.volumeText }}</text>
           </view>
         </view>
 
@@ -453,7 +474,7 @@ function sortedMeals(day: any) {
             </view>
           </view>
           <view v-if="mode === 'ready'" class="btn" @click="openWeekly">
-            一键预订本周 · 已订 {{ weekOrderedDays }}/{{ days.length }} 天
+            一键预订{{ weekWord }} · 已订 {{ weekOrderedDays }}/{{ days.length }} 天
           </view>
           <view v-else-if="mode === 'no-plan'" class="btn" @click="generatePlan">生成本周个人计划</view>
           <view v-else class="btn" @click="goOnboarding">获取我的三餐方案</view>
@@ -465,14 +486,18 @@ function sortedMeals(day: any) {
 
     <view v-if="showWeekly" class="sheet-mask" @click.self="showWeekly = false">
       <view class="sheet">
-        <view class="sheet-title">一键预订本周</view>
-        <view class="sheet-tip">{{ weekStartOf() }} 起 · 可取消其中几天</view>
+        <view class="sheet-title">一键预订{{ weekWord }}</view>
+        <view class="sheet-tip">默认全选还能订的日子，点一下可取消某天</view>
+        <view v-if="!weeklyCandidates.length" class="muted">{{ weekWord }}已没有可预订的日期（已订或已过截单时间）</view>
         <view class="week-days">
-          <view v-for="d in (weeklyQuote?.days || [])" :key="d.serviceDate" class="week-day"
+          <view v-for="d in weeklyCandidates" :key="d.serviceDate" class="week-day"
                 :class="{ on: weeklyDates.includes(d.serviceDate) }" @click="toggleWeekDay(d.serviceDate)">
-            <text>{{ short(d.serviceDate) }}</text>
+            <text>{{ short(d.serviceDate) }} 周{{ weekdayText(d.serviceDate) }}</text>
             <text class="muted">¥{{ money(d.originalAmount) }}</text>
           </view>
+        </view>
+        <view v-if="weeklyQuote && weeklyCouponId && weeklyQuote.couponValid === false" class="coupon-warn">
+          {{ weeklyQuote.couponMessage }}
         </view>
         <view v-if="weeklyQuote" class="amount">
           <view class="row between"><text class="muted">合计</text><text>¥{{ money(weeklyQuote.originalTotal) }}</text></view>
@@ -482,13 +507,13 @@ function sortedMeals(day: any) {
         <view v-if="weeklyCoupons.length" class="coupon-list">
           <view class="coupon" :class="{ on: weeklyCouponId === null }" @click="pickWeeklyCoupon(null)">不使用优惠券</view>
           <view v-for="c in weeklyCoupons" :key="c.id" class="coupon" :class="{ on: weeklyCouponId === c.id }" @click="pickWeeklyCoupon(c.id)">
-            <text>{{ c.name }}</text><text class="coupon-rule">满 {{ money(c.thresholdAmount) }} 减 {{ money(c.discountAmount) }}</text>
+            <text>{{ c.name }}</text><text class="coupon-rule">{{ couponRule(c) }}</text>
           </view>
         </view>
         <input v-model="delivery.contactName" class="field" placeholder="联系人" />
         <input v-model="delivery.contactPhone" class="field" placeholder="联系电话" type="number" />
         <input v-model="delivery.address" class="field" placeholder="配送地址" />
-        <view class="btn" :class="{ disabled: weeklyBusy }" @click="submitWeekly">
+        <view class="btn" :class="{ disabled: weeklyBusy || !weeklyDates.length }" @click="submitWeekly">
           {{ weeklyBusy ? '提交中…' : '确认预订 · ¥' + money(weeklyQuote?.payableTotal) }}
         </view>
         <view class="sheet-cancel" @click="showWeekly = false">取消</view>
@@ -528,10 +553,7 @@ function sortedMeals(day: any) {
             @click="pickCoupon(c.id)"
           >
             <text class="coupon-name">{{ c.name }}</text>
-            <text class="coupon-rule">
-              {{ c.type === 'CASH' ? '满 ' + money(c.thresholdAmount) + ' 减 ' + money(c.discountAmount)
-                                   : '立减 ' + money(c.discountAmount) }}
-            </text>
+            <text class="coupon-rule">{{ couponRule(c) }}</text>
           </view>
         </view>
 

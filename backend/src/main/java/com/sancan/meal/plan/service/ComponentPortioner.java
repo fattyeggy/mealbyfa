@@ -27,8 +27,8 @@ import java.util.stream.Collectors;
 @Component
 public class ComponentPortioner {
 
-    private static final BigDecimal MIN_FACTOR = new BigDecimal("0.30");
-    private static final BigDecimal MAX_FACTOR = new BigDecimal("2.50");
+    public static final BigDecimal MIN_FACTOR = new BigDecimal("0.30");
+    public static final BigDecimal MAX_FACTOR = new BigDecimal("2.50");
 
     private final RecipeBomMapper recipeBomMapper;
     private final IngredientMapper ingredientMapper;
@@ -62,9 +62,11 @@ public class ComponentPortioner {
             if (ing == null || ing.getKcalPer100g() == null) {
                 return null;
             }
-            String type = normalize(ing.getComponentType());
+            String type = effectiveType(line, ing);
             double grams = line.getNetWeightG() == null ? 0 : line.getNetWeightG().doubleValue();
-            double[] totals = component.computeIfAbsent(type, k -> new double[4]);
+            // 汤汁跟主料一起缩放，计入蛋白组件
+            double[] totals = component.computeIfAbsent("SAUCE".equals(type) ? "PROTEIN" : type,
+                    k -> new double[4]);
             totals[0] += grams / 100.0 * nz(ing.getProteinPer100g());
             totals[1] += grams / 100.0 * nz(ing.getCarbPer100g());
             totals[2] += grams / 100.0 * nz(ing.getFatPer100g());
@@ -89,20 +91,28 @@ public class ComponentPortioner {
         double ff = clamp(solved[2]);
         boolean clamped = solved[0] != fp || solved[1] != fc || solved[2] != ff;
 
+        // 单餐重量按熟重：配方行有熟重用熟重，否则按 版本净重 ÷ 配方生重合计 等比折算。
+        // 之前直接加生重，米饭这类生熟差 2.5 倍的组件会让用户看到的克数和实际出品对不上。
+        double rawTotal = bom.stream().mapToDouble(l -> l.getNetWeightG() == null ? 0 : l.getNetWeightG().doubleValue()).sum();
+        boolean allCooked = bom.stream().allMatch(l -> l.getCookedWeightG() != null && l.getCookedWeightG().signum() > 0);
+        double cookedRatio = version.getNetWeightG() != null && version.getNetWeightG() > 0 && rawTotal > 0
+                ? version.getNetWeightG() / rawTotal : 1.0;
+
         double weight = 0;
         double protein = 0, carb = 0, fat = 0, kcal = 0;
         BigDecimal cost = BigDecimal.ZERO;
         for (RecipeBomDO line : bom) {
             IngredientDO ing = ingredients.get(line.getIngredientId());
-            String type = normalize(ing.getComponentType());
+            String type = effectiveType(line, ing);
             double factor = switch (type) {
-                case "PROTEIN" -> fp;
+                case "PROTEIN", "SAUCE" -> fp;
                 case "STAPLE" -> fc;
                 case "FAT" -> ff;
                 default -> 1.0;
             };
             double grams = (line.getNetWeightG() == null ? 0 : line.getNetWeightG().doubleValue()) * factor;
-            weight += grams;
+            double cooked = allCooked ? line.getCookedWeightG().doubleValue() * factor : grams * cookedRatio;
+            weight += cooked;
             protein += grams / 100.0 * nz(ing.getProteinPer100g());
             carb += grams / 100.0 * nz(ing.getCarbPer100g());
             fat += grams / 100.0 * nz(ing.getFatPer100g());
@@ -187,13 +197,23 @@ public class ComponentPortioner {
         return value == null ? 0 : value.doubleValue();
     }
 
+    /** 配方行指定了组件类型时以配方行为准（做菜记录同步写入），否则沿用食材上的类型。 */
+    private String effectiveType(RecipeBomDO line, IngredientDO ing) {
+        if (line.getComponentType() != null && !line.getComponentType().isBlank()) {
+            return normalize(line.getComponentType());
+        }
+        String type = normalize(ing.getComponentType());
+        // 食材本身不会被标成汤汁；只有配方行可以
+        return "SAUCE".equals(type) ? "OTHER" : type;
+    }
+
     private String normalize(String type) {
         if (type == null || type.isBlank()) {
             return "OTHER";
         }
         String upper = type.trim().toUpperCase();
         return switch (upper) {
-            case "PROTEIN", "STAPLE", "VEGETABLE", "FAT" -> upper;
+            case "PROTEIN", "SAUCE", "STAPLE", "VEGETABLE", "FAT" -> upper;
             default -> "OTHER";
         };
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, PageResult } from '../api'
 
@@ -15,6 +15,10 @@ interface Ingredient {
   shelfLifeDays?: number
   allergens?: string
   movingAvgPrice: number
+  kcalPer100g?: number | null
+  proteinPer100g?: number | null
+  carbPer100g?: number | null
+  fatPer100g?: number | null
   status: number
 }
 
@@ -69,7 +73,7 @@ const versions = ref<DishVersion[]>([])
 
 const showVersionForm = ref(false)
 const versionForm = reactive<any>({
-  netWeightG: 500, kcal: 600, proteinG: 35, carbG: 60, fatG: 15, remark: '',
+  netWeightG: 500, kcal: 0, proteinG: 0, carbG: 0, fatG: 0, remark: '',
   bom: [{ ingredientId: null, netWeightG: 100, note: '' }]
 })
 
@@ -183,11 +187,48 @@ async function openVersions(row: Dish) {
 
 function openVersionForm() {
   Object.assign(versionForm, {
-    netWeightG: 500, kcal: 600, proteinG: 35, carbG: 60, fatG: 15, remark: '',
+    netWeightG: 500, kcal: 0, proteinG: 0, carbG: 0, fatG: 0, remark: '',
     bom: [{ ingredientId: null, netWeightG: 100, note: '' }]
   })
   showVersionForm.value = true
 }
+
+/**
+ * 按 BOM 和食材每 100g 营养算一份的营养。之前表单默认填 600kcal/35g 蛋白，
+ * 不改就直接存进版本，用户端看到的营养就是假的。
+ */
+const bomNutrition = computed(() => {
+  const lines = versionForm.bom.filter((l: any) => l.ingredientId && l.netWeightG > 0)
+  let kcal = 0, protein = 0, carb = 0, fat = 0, raw = 0
+  const missing: string[] = []
+  for (const line of lines) {
+    const ing = ingredients.value.find((i) => i.id === line.ingredientId)
+    raw += Number(line.netWeightG)
+    if (!ing || ing.kcalPer100g == null) {
+      missing.push(ing?.name || '未知食材')
+      continue
+    }
+    const k = Number(line.netWeightG) / 100
+    kcal += k * Number(ing.kcalPer100g || 0)
+    protein += k * Number(ing.proteinPer100g || 0)
+    carb += k * Number(ing.carbPer100g || 0)
+    fat += k * Number(ing.fatPer100g || 0)
+  }
+  return {
+    lines: lines.length, raw: Math.round(raw), missing,
+    kcal: Math.round(kcal), proteinG: +protein.toFixed(1), carbG: +carb.toFixed(1), fatG: +fat.toFixed(1)
+  }
+})
+
+function applyBomNutrition() {
+  const n = bomNutrition.value
+  Object.assign(versionForm, { kcal: n.kcal, proteinG: n.proteinG, carbG: n.carbG, fatG: n.fatG })
+}
+
+// BOM 里的食材都有营养数据时自动回填，缺数据时保留手填值
+watch(() => bomNutrition.value, (n) => {
+  if (showVersionForm.value && n.lines && !n.missing.length) applyBomNutrition()
+}, { deep: true })
 
 function addBomLine() {
   versionForm.bom.push({ ingredientId: null, netWeightG: 50, note: '' })
@@ -202,6 +243,10 @@ async function saveVersion() {
   const bom = versionForm.bom.filter((line: any) => line.ingredientId && line.netWeightG > 0)
   if (!bom.length) {
     ElMessage.warning('BOM 至少需要一行有效食材')
+    return
+  }
+  if (!versionForm.kcal || !versionForm.proteinG) {
+    ElMessage.warning('热量和蛋白还是 0，先补齐食材营养数据或手动填写')
     return
   }
   try {
@@ -349,12 +394,19 @@ onMounted(() => {
 
       <el-dialog v-model="showVersionForm" title="新建菜品版本" width="620px" append-to-body>
         <el-form label-width="90px">
-          <el-form-item label="净重(g)"><el-input-number v-model="versionForm.netWeightG" :min="1" :step="10" /></el-form-item>
+          <el-form-item label="净重(g)">
+            <el-input-number v-model="versionForm.netWeightG" :min="1" :step="10" />
+            <span class="hint">一份做熟后的重量<template v-if="bomNutrition.raw">（BOM 生重合计 {{ bomNutrition.raw }}g）</template></span>
+          </el-form-item>
           <el-form-item label="热量">
             <el-input-number v-model="versionForm.kcal" :min="0" :step="10" />
             <span class="hint">kcal / 份</span>
           </el-form-item>
           <el-form-item label="蛋白(g)"><el-input-number v-model="versionForm.proteinG" :min="0" :step="1" /></el-form-item>
+          <el-form-item v-if="bomNutrition.lines" label=" ">
+            <span v-if="!bomNutrition.missing.length" class="hint">营养已按 BOM 自动计算</span>
+            <span v-else class="hint warn">{{ bomNutrition.missing.join('、') }} 没有每 100g 营养数据，营养需手动填写</span>
+          </el-form-item>
           <el-form-item label="碳水/脂肪">
             <el-input-number v-model="versionForm.carbG" :min="0" :step="1" />
             <el-input-number v-model="versionForm.fatG" :min="0" :step="1" />
@@ -383,6 +435,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.hint.warn {
+  color: #b45309;
+}
+
 .hint {
   margin-left: 10px;
   color: #8a9a91;

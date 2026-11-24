@@ -42,7 +42,44 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: any) => request<T>('POST', path, body),
-  put: <T>(path: string, body?: any) => request<T>('PUT', path, body)
+  put: <T>(path: string, body?: any) => request<T>('PUT', path, body),
+  delete: <T>(path: string) => request<T>('DELETE', path)
+}
+
+/** 上传单个文件（multipart，字段名 file），返回接口 data。 */
+export async function uploadFile<T>(path: string, file: Blob, filename = 'photo.jpg'): Promise<T> {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    body: form
+  })
+  let payload: ApiResult<T> | null = null
+  try {
+    payload = (await res.json()) as ApiResult<T>
+  } catch {
+    throw new Error(res.status === 413 ? '照片太大，请重拍' : `上传失败（${res.status}）`)
+  }
+  if (payload && payload.code === 0) {
+    return payload.data
+  }
+  if (payload && payload.code === 401) {
+    clearToken()
+    location.hash = '#/login'
+  }
+  throw new Error(payload?.msg || `上传失败（${res.status}）`)
+}
+
+/** 带鉴权读取图片等二进制，返回可用于 <img src> 的 object URL，用完需 revokeObjectURL。 */
+export async function fetchBlobUrl(path: string): Promise<string> {
+  const res = await fetch(BASE + path, {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}
+  })
+  if (!res.ok) {
+    throw new Error(`读取失败（${res.status}）`)
+  }
+  return URL.createObjectURL(await res.blob())
 }
 
 export async function login(username: string, password: string) {

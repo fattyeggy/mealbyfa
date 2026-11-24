@@ -90,7 +90,7 @@ async function refund() {
 async function markDelivery(id: number, next: string) {
   if (!detail.value) return
   try {
-    await api.post(`/meal/orders/${detail.value.id}/delivery`, { deliveryBatch: batch, status: next })
+    await api.post(`/meal/orders/${detail.value.id}/delivery`, { deliveryId: id, status: next })
     ElMessage.success('配送状态已更新')
     detail.value = await api.get<any>(`/meal/orders/${detail.value.id}`)
     await load()

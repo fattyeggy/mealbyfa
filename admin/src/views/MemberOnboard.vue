@@ -121,12 +121,21 @@ async function submit() {
         <div>会员 ID：{{ result.memberId }}</div>
         <div>蛋白档位：{{ result.proteinTier }}g / 热量 {{ result.kcal }} kcal / 碳水 {{ result.carbG }}g / 脂肪 {{ result.fatG }}g</div>
       </div>
+      <div v-if="result?.claimCode" class="result">
+        <div>认领码：<strong class="claim">{{ result.claimCode }}</strong></div>
+        <div class="claim-hint">
+          私下发给 {{ result.phone }} 本人。用户在小程序里手动输入手机号认领档案时需要填这个码；
+          用微信手机号授权认领则不需要。不要发到群里。
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .form-panel { max-width: 760px; }
+.claim { font-size: 20px; letter-spacing: 4px; }
+.claim-hint { font-size: 13px; color: #556a5e; margin-top: 4px; }
 .gap { display: inline-block; width: 8px; }
 .result { margin-top: 16px; padding: 12px 16px; background: #f2f7ec; border-radius: 10px; line-height: 1.8; }
 </style>

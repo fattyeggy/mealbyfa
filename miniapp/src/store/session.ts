@@ -103,3 +103,34 @@ export function mealLabel(mealType: string) {
 export function weekdayLabel(index: number) {
   return ['一', '二', '三', '四', '五', '六', '日'][index] || ''
 }
+
+/** 菜名去掉内部编号后缀（如「照烧鸡胸饭-P1」）。 */
+export function cleanDishName(name?: string) {
+  return (name || '').replace(/-?P\d+$/i, '')
+}
+
+/** 券规则文案：满减券 / 折扣券。 */
+export function couponRule(c: any) {
+  if (!c) return ''
+  const threshold = Number(c.thresholdAmount || 0)
+  const prefix = threshold > 0 ? '满 ' + money(threshold) + ' ' : ''
+  if (c.type === 'RATE') {
+    const pct = Math.round(Number(c.discountRate || 0) * 100)
+    const cap = Number(c.maxDiscountAmount || 0) > 0 ? '，最多减 ' + money(c.maxDiscountAmount) : ''
+    return prefix + '减 ' + pct + '%' + cap
+  }
+  return (threshold > 0 ? prefix + '减 ' : '立减 ') + money(c.discountAmount)
+}
+
+/** 由 yyyy-MM-dd 得到「一」…「日」，不依赖列表下标。 */
+export function weekdayOf(iso?: string) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  const idx = (new Date(y, m - 1, d).getDay() + 6) % 7
+  return ['一', '二', '三', '四', '五', '六', '日'][idx]
+}
+
+export function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

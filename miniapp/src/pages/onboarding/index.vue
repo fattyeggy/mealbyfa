@@ -58,7 +58,7 @@ const blockedText: Record<string, string> = {
   over_65: '65 岁以上需专业评估',
   pregnant: '孕期需专业评估',
   breastfeeding: '哺乳期需专业评估',
-  kidney_disease: '肾病需遵医嘱，请人工咨询',
+  kidney_disease: '肾病饮食需遵医嘱',
   diabetes: '糖尿病需专业评估',
   eating_disorder_history: '进食障碍史需专业评估',
   cut_bmi_too_low: 'BMI 低于 18.5，不建议减脂，请改选维持或增肌'
@@ -80,10 +80,15 @@ const coverage = computed(() => {
     .reduce((acc, m) => acc + m.share, 0)
   return Math.round(sum * 100)
 })
+// 日价以后台定价为准（生成计划后读取），前端公式只在读取失败时兜底
+const planPrice = ref<number | null>(null)
 const price = computed(() => {
+  if (planPrice.value != null) return Math.round(planPrice.value)
   if (!result.value) return 0
   return Math.max(65, Math.round(66 + 1.9 * (result.value.proteinTier - 60) / 10))
 })
+const missingMeals = computed(() =>
+  mealOptions.filter(m => !form.orderedMeals.includes(m.value)).map(m => m.label).join('、'))
 
 function h5Tip() { uni.showToast({ title: '请在微信中打开', icon: 'none' }) }
 function startOnboarding() { phase.value = 'form'; step.value = 1 }
@@ -136,12 +141,59 @@ async function submit() {
     try {
       await api.post('/app/plan/generate', { weekDate: todayIso() })
       gap.value = await api.get(`/app/onboarding/gap?date=${todayIso()}`)
+      const week: any = await api.get(`/app/plan/week?date=${todayIso()}`)
+      const p = Number(week?.days?.[0]?.dailyPrice)
+      planPrice.value = Number.isFinite(p) && p > 0 ? p : null
     } catch (e) { gap.value = null }
   } catch (e: any) {
     uni.showModal({ title: '提交失败', content: e.message || '请稍后再试', showCancel: false })
   } finally { saving.value = false }
 }
 function finish() { refreshWallet(); uni.reLaunch({ url: '/pages/index/index' }) }
+
+async function manualPhone() {
+  const res: any = await new Promise(resolve => uni.showModal({
+    title: '绑定手机号',
+    editable: true,
+    placeholderText: '请输入 11 位手机号',
+    success: resolve
+  }))
+  if (!res.confirm) return
+  const phone = (res.content || '').trim()
+  if (!/^1\d{10}$/.test(phone)) {
+    uni.showToast({ title: '手机号格式不正确', icon: 'none' })
+    return
+  }
+  try {
+    try {
+      await api.post('/app/auth/bind-phone', { phone })
+    } catch (err: any) {
+      // 这个手机号有后台预建的档案：手动输入的手机号未经验证，需要客服给的认领码
+      if (!String(err?.message || '').includes('认领码')) throw err
+      const codeRes: any = await new Promise(resolve => uni.showModal({
+        title: '输入认领码',
+        content: '这个手机号已有为你建好的档案，请输入客服发给你的 6 位认领码',
+        editable: true,
+        placeholderText: '6 位数字',
+        success: resolve
+      }))
+      if (!codeRes.confirm) return
+      await api.post('/app/auth/bind-phone', { phone, claimCode: (codeRes.content || '').trim() })
+    }
+    showPhoneOverlay.value = false
+    phoneClaimed.value = true
+    await refreshProfile()
+    if (session.profile?.onboardingCompleted) {
+      uni.showToast({ title: '已登录', icon: 'success' })
+      setTimeout(() => uni.reLaunch({ url: '/pages/index/index' }), 500)
+    } else {
+      phase.value = 'intro'
+      uni.showToast({ title: '手机号已绑定', icon: 'success' })
+    }
+  } catch (err: any) {
+    uni.showModal({ title: '绑定失败', content: err.message || '请稍后再试', showCancel: false })
+  }
+}
 
 async function onGetPhone(e: any) {
   const code = e?.detail?.code
@@ -195,9 +247,8 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 function gapText(line: any) {
-  if (line.status === 'SHORT') return '还差 ' + line.gapG + 'g'
-  if (line.status === 'OVER') return '超出 ' + line.excessG + 'g'
-  return '已达标'
+  return line.volumeText || (line.status === 'SHORT' ? '还差 ' + line.gapG + 'g'
+    : line.status === 'OVER' ? '超出 ' + line.excessG + 'g' : '已达标')
 }
 onMounted(async () => {
   await loadSlides()
@@ -228,6 +279,7 @@ onMounted(async () => {
         <!-- #ifndef MP-WEIXIN -->
         <view class="phone-btn" @click="h5Tip">请在微信中打开</view>
         <!-- #endif -->
+        <view class="phone-skip" @click="manualPhone">手动输入手机号</view>
         <view class="phone-skip" @click="showPhoneOverlay = false; phase = 'intro'">先建档，稍后绑定</view>
       </view>
     </view>
@@ -366,15 +418,15 @@ onMounted(async () => {
       </view>
       <view class="expect">{{ result.expectedWeeklyChange }}</view>
       <view class="price-card">
-        <view class="row between"><text>三餐参考价</text><text class="price">约 ¥{{ price }}/天</text></view>
-        <text class="muted">按蛋白档位计价，最终以下单页为准</text>
+        <view class="row between"><text>参考日价</text><text class="price">约 ¥{{ price }}/天</text></view>
+        <text class="muted">按你选的餐次和蛋白档位计价，最终以下单页为准</text>
       </view>
       <view class="coverage">
-        <text v-if="coverage < 100">当前订 {{ coverage }}% 的餐次；{{ coverage < 100 ? '加早餐即可覆盖全天蛋白' : '' }}</text>
-        <text v-else>三餐已覆盖全天目标</text>
+        <text v-if="coverage < 100">你选的餐次覆盖全天约 {{ coverage }}% 的目标；没订的{{ missingMeals }}需要自己补，加订即可吃够</text>
+        <text v-else>三餐都在这里吃，就能吃够全天目标</text>
       </view>
-      <view v-if="gap && gap.lines?.length" class="gap card">
-        <view class="section">今日进度</view>
+      <view v-if="coverage < 100 && gap && gap.lines?.length" class="gap card">
+        <view class="section">只吃你选的餐次，每天还需要自己补</view>
         <view v-for="line in gap.lines" :key="line.nutrient" class="gap-line">
           <view class="row between">
             <text>{{ line.label }}</text>

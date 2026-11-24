@@ -28,6 +28,11 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  servlet:
+    multipart:
+      # 做菜步骤照片：前端已压缩，单张上限 5MB
+      max-file-size: 6MB
+      max-request-size: 7MB
   jackson:
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai

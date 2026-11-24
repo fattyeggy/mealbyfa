@@ -34,20 +34,28 @@ public class MemberBindingService {
     private final WalletLedgerMapper ledgerMapper;
     private final CouponMapper couponMapper;
     private final OrderMapper orderMapper;
+    private final MemberClaimCodes claimCodes;
 
     public MemberBindingService(MemberUserMapper memberUserMapper, UserProfileMapper profileMapper,
                                 WalletAccountMapper accountMapper, WalletLedgerMapper ledgerMapper,
-                                CouponMapper couponMapper, OrderMapper orderMapper) {
+                                CouponMapper couponMapper, OrderMapper orderMapper,
+                                MemberClaimCodes claimCodes) {
         this.memberUserMapper = memberUserMapper;
         this.profileMapper = profileMapper;
         this.accountMapper = accountMapper;
         this.ledgerMapper = ledgerMapper;
         this.couponMapper = couponMapper;
         this.orderMapper = orderMapper;
+        this.claimCodes = claimCodes;
     }
 
+    /**
+     * @param phoneVerified 手机号是否已由微信验证（getPhoneNumber）。手动输入的手机号为 false：
+     *                      若要认领后台预建的档案，必须提供后台给出的认领码。
+     * @param claimCode     认领码，手机号已验证时忽略
+     */
     @Transactional
-    public Long bind(Long userId, String rawPhone) {
+    public Long bind(Long userId, String rawPhone, boolean phoneVerified, String claimCode) {
         String phone = normalize(rawPhone);
         MemberUserDO current = memberUserMapper.selectById(userId);
         if (current == null) {
@@ -63,6 +71,9 @@ public class MemberBindingService {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "该手机号已绑定其他微信账号");
         }
         Long placeholderId = existing.getId();
+        if (!phoneVerified) {
+            claimCodes.verify(userId, placeholderId, phone, claimCode);
+        }
 
         // 档案：以后台录入的为准
         UserProfileDO currentProfile = profileMapper.selectOne(

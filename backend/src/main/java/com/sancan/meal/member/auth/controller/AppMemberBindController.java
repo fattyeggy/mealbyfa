@@ -53,7 +53,7 @@ public class AppMemberBindController {
     public CommonResult<String> wechatPhone(@RequestBody WeChatPhoneReq req) {
         Long userId = UserContext.requireMemberId();
         String phone = weChatApiClient.getPhoneNumber(req.code());
-        bindingService.bind(userId, phone);
+        bindingService.bind(userId, phone, true, null);
         return CommonResult.ok(phone);
     }
 
@@ -63,10 +63,11 @@ public class AppMemberBindController {
     @PostMapping("/bind-phone")
     public CommonResult<Boolean> bind(@RequestBody BindReq req) {
         Long userId = UserContext.requireMemberId();
-        bindingService.bind(userId, req.phone());
+        // 手动输入的手机号未经验证：认领后台预建档案需要认领码
+        bindingService.bind(userId, req.phone(), false, req.claimCode());
         return CommonResult.ok(true);
     }
 
-    public record BindReq(String phone) {
+    public record BindReq(String phone, String claimCode) {
     }
 }

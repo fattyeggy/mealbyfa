@@ -58,7 +58,10 @@ public enum ErrorCode {
 
     // 反馈
     FEEDBACK_MEAL_NOT_DELIVERED(1600, "该餐次尚未送达，暂时不能反馈"),
-    FEEDBACK_DUPLICATED(1601, "该餐次已经反馈过了");
+    FEEDBACK_DUPLICATED(1601, "该餐次已经反馈过了"),
+
+    // 会员
+    CLAIM_CODE_REQUIRED(1700, "这个手机号已有后台建好的档案，请输入客服提供的 6 位认领码");
 
     private final int code;
     private final String message;
